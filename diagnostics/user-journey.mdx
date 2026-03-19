@@ -1,0 +1,33 @@
+---
+title: 'User journey'
+description: 'An overview of the Node.js diagnostics guides and how they are organized around user journeys for root-causing issues.'
+---
+
+These diagnostics guides were created by the [Diagnostics Working Group](https://github.com/nodejs/diagnostics)
+and the [Node.js Website Team](https://github.com/nodejs/nodejs.org) with the objective of providing guidance
+when diagnosing an issue in a user's application.
+
+The documentation project is organized based on user journey. Those journeys
+are a coherent set of step-by-step procedures that a user can follow to
+root-cause their issues.
+
+## Journeys
+
+<CardGroup cols={2}>
+  <Card title="Live debugging" icon="bug" href="/diagnostics/debugging">
+    Attach a debugger to a running Node.js process, set breakpoints, and inspect
+    variables step by step.
+  </Card>
+  <Card title="Memory" icon="memory-stick" href="/diagnostics/profiling">
+    Diagnose memory leaks, out-of-memory crashes, and inefficient memory usage
+    using heap snapshots, heap profiling, and GC traces.
+  </Card>
+  <Card title="Poor performance" icon="gauge" href="/diagnostics/profiling">
+    Profile CPU usage with the V8 sampling profiler or Linux perf to identify
+    hot functions and bottlenecks.
+  </Card>
+  <Card title="Flame graphs" icon="chart-bar" href="/diagnostics/flame-graphs">
+    Visualize CPU time spent in functions with flame graphs to pinpoint
+    synchronous bottlenecks.
+  </Card>
+</CardGroup>

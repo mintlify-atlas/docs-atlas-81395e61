@@ -1,122 +1,135 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Node.js Learn",
+  "theme": "palm",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#417E38",
+    "light": "#5BA34E",
+    "dark": "#2D5C27"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/avivkeller/learn"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/avivkeller/learn"
+    }
+  },
   "navigation": {
     "tabs": [
       {
         "tab": "Guides",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Getting Started",
             "pages": [
               "index",
-              "quickstart",
-              "development"
+              "getting-started/introduction-to-nodejs",
+              "getting-started/how-much-javascript-do-you-need-to-know-to-use-nodejs",
+              "getting-started/differences-between-nodejs-and-the-browser",
+              "getting-started/the-v8-javascript-engine",
+              "getting-started/nodejs-the-difference-between-development-and-production",
+              "getting-started/ecmascript-2015-es6-and-beyond",
+              "getting-started/nodejs-with-webassembly",
+              "getting-started/userland-migrations"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Asynchronous Work",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "asynchronous-work/asynchronous-flow-control",
+              "asynchronous-work/overview-of-blocking-vs-non-blocking",
+              "asynchronous-work/javascript-asynchronous-programming-and-callbacks",
+              "asynchronous-work/discover-javascript-timers",
+              "asynchronous-work/event-loop-timers-and-nexttick",
+              "asynchronous-work/understanding-processnexttick",
+              "asynchronous-work/understanding-setimmediate",
+              "asynchronous-work/dont-block-the-event-loop",
+              "asynchronous-work/the-nodejs-event-emitter",
+              "asynchronous-work/discover-promises-in-nodejs",
+              "asynchronous-work/how-to-use-streams",
+              "asynchronous-work/backpressuring-in-streams"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Command Line",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "command-line/run-nodejs-scripts-from-the-command-line",
+              "command-line/how-to-use-the-nodejs-repl",
+              "command-line/output-to-the-command-line-using-nodejs",
+              "command-line/accept-input-from-the-command-line-in-nodejs",
+              "command-line/how-to-read-environment-variables-from-nodejs"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "File System",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "API reference",
-        "groups": [
-          {
-            "group": "API documentation",
-            "pages": [
-              "api-reference/introduction"
+              "file-system/nodejs-file-paths",
+              "file-system/nodejs-file-stats",
+              "file-system/reading-files-with-nodejs",
+              "file-system/writing-files-with-nodejs",
+              "file-system/working-with-file-descriptors-in-nodejs",
+              "file-system/working-with-folders-in-nodejs",
+              "file-system/working-with-different-filesystems"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "HTTP",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "http/anatomy-of-an-http-transaction",
+              "http/fetch",
+              "http/websocket",
+              "http/enterprise-network-configuration"
+            ]
+          },
+          {
+            "group": "Package Management",
+            "pages": [
+              "package-management/an-introduction-to-the-npm-package-manager",
+              "package-management/publishing-a-package",
+              "package-management/publishing-node-api-modules",
+              "package-management/abi-stability"
+            ]
+          },
+          {
+            "group": "Diagnostics",
+            "pages": [
+              "diagnostics/user-journey",
+              "diagnostics/debugging",
+              "diagnostics/profiling",
+              "diagnostics/flame-graphs"
+            ]
+          },
+          {
+            "group": "Security",
+            "pages": [
+              "security/security-best-practices"
+            ]
+          },
+          {
+            "group": "Testing",
+            "pages": [
+              "testing/introduction",
+              "testing/using-test-runner",
+              "testing/mocking",
+              "testing/collecting-code-coverage"
+            ]
+          },
+          {
+            "group": "TypeScript",
+            "pages": [
+              "typescript/introduction",
+              "typescript/run",
+              "typescript/run-natively",
+              "typescript/transpile",
+              "typescript/publishing-a-ts-package"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

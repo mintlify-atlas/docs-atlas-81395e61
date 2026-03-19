@@ -1,0 +1,188 @@
+---
+title: 'Output to the command line using Node.js'
+description: 'Learn how to use the Node.js console module to print output, format strings, count calls, trace stacks, measure time, and style terminal text.'
+---
+
+## Basic output using the console module
+
+Node.js provides a [`console` module](https://nodejs.org/docs/latest-v22.x/api/console.html) which provides many useful ways to interact with the command line. It is basically the same as the `console` object you find in the browser.
+
+The most basic and most used method is `console.log()`, which prints the string you pass to it to the console. If you pass an object, it will render it as a string.
+
+You can pass multiple variables to `console.log`:
+
+```javascript
+const x = 'x';
+const y = 'y';
+
+console.log(x, y);
+```
+
+Node.js will print both.
+
+### Format specifiers
+
+You can also format strings by passing variables and a format specifier:
+
+```javascript
+console.log('My %s has %d ears', 'cat', 2);
+```
+
+| Specifier | Description |
+| --- | --- |
+| `%s` | Format a variable as a string |
+| `%d` | Format a variable as a number |
+| `%i` | Format a variable as its integer part only |
+| `%o` | Format a variable as an object |
+
+Example:
+
+```javascript
+console.log('%o', Number);
+```
+
+## Clear the console
+
+`console.clear()` clears the console (the behavior might depend on the console used).
+
+## Counting elements
+
+`console.count()` is a handy method that counts the number of times a string is printed and displays the count next to it.
+
+```javascript
+const x = 1;
+const y = 2;
+const z = 3;
+
+console.count(
+  'The value of x is ' + x + ' and has been checked .. how many times?'
+);
+
+console.count(
+  'The value of x is ' + x + ' and has been checked .. how many times?'
+);
+
+console.count(
+  'The value of y is ' + y + ' and has been checked .. how many times?'
+);
+```
+
+You can use it to count apples and oranges:
+
+```javascript
+const oranges = ['orange', 'orange'];
+const apples = ['just one apple'];
+
+oranges.forEach(fruit => {
+  console.count(fruit);
+});
+apples.forEach(fruit => {
+  console.count(fruit);
+});
+```
+
+## Reset counting
+
+`console.countReset()` resets a counter used with `console.count()`.
+
+```javascript
+const oranges = ['orange', 'orange'];
+const apples = ['just one apple'];
+
+oranges.forEach(fruit => {
+  console.count(fruit);
+});
+apples.forEach(fruit => {
+  console.count(fruit);
+});
+
+console.countReset('orange');
+
+oranges.forEach(fruit => {
+  console.count(fruit);
+});
+```
+
+The call to `console.countReset('orange')` resets the value counter to zero.
+
+## Print the stack trace
+
+There might be cases where it's useful to print the call stack trace of a function — for example, to answer the question _how did you reach that part of the code?_
+
+You can do so using `console.trace()`:
+
+```javascript
+const function2 = () => console.trace();
+const function1 = () => function2();
+function1();
+```
+
+This will print the stack trace. Here is what gets printed when tried in the Node.js REPL:
+
+```bash
+Trace
+    at function2 (repl:1:33)
+    at function1 (repl:1:25)
+    at repl:1:1
+    at ContextifyScript.Script.runInThisContext (vm.js:44:33)
+    at REPLServer.defaultEval (repl.js:239:29)
+    at bound (domain.js:301:14)
+    at REPLServer.runBound [as eval] (domain.js:314:12)
+    at REPLServer.onLine (repl.js:440:10)
+    at emitOne (events.js:120:20)
+    at REPLServer.emit (events.js:210:7)
+```
+
+## Calculate the time spent
+
+You can easily calculate how much time a function takes to run using `console.time()` and `console.timeEnd()`:
+
+```javascript
+const doSomething = () => console.log('test');
+const measureDoingSomething = () => {
+  console.time('doSomething()');
+  // do something, and measure the time it takes
+  doSomething();
+  console.timeEnd('doSomething()');
+};
+measureDoingSomething();
+```
+
+## stdout and stderr
+
+`console.log` prints to the standard output (`stdout`). `console.error` prints to the `stderr` stream. It will appear in the console, but can be handled separately from regular output.
+
+## Color the output
+
+<Note>
+This section covers `styleText`, which was marked as 'Active development' in Node.js v22.11.
+</Note>
+
+The `node:util` module provides a `styleText` function to style terminal output.
+
+First, import `styleText`:
+
+<Tabs>
+  <Tab title="ESM">
+    ```javascript
+    import { styleText } from 'node:util';
+    ```
+  </Tab>
+  <Tab title="CJS">
+    ```javascript
+    const { styleText } = require('node:util');
+    ```
+  </Tab>
+</Tabs>
+
+Then use it to style your text:
+
+```javascript
+console.log(
+  styleText(['red'], 'This is red text ') +
+    styleText(['green', 'bold'], 'and this is green bold text ') +
+    'this is normal text'
+);
+```
+
+The first argument is an array of styles, and the second argument is the text you want to style. Read [the docs](https://nodejs.org/docs/latest-v22.x/api/util.html#utilstyletextformat-text-options) for a full list of available styles.

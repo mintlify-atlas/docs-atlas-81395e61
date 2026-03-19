@@ -1,0 +1,92 @@
+---
+title: Running TypeScript using transpilation
+description: Learn how to compile TypeScript to JavaScript using tsc and run the output with Node.js, including how TypeScript catches type errors at compile time.
+---
+
+Transpilation is the process of converting source code from one language to another. In the case of TypeScript, it's the process of converting TypeScript code to JavaScript code. This is necessary because browsers and Node.js don't run TypeScript code directly.
+
+## Compiling TypeScript to JavaScript
+
+The most common way to run TypeScript code is to compile it to JavaScript first. You can do this using the TypeScript compiler `tsc`.
+
+<Steps>
+  <Step title="Write your TypeScript code">
+    Write your TypeScript code in a file, for example `example.ts`:
+
+    ```typescript
+    type User = {
+      name: string;
+      age: number;
+    };
+
+    function isAdult(user: User): boolean {
+      return user.age >= 18;
+    }
+
+    const justine = {
+      name: 'Justine',
+      age: 23,
+    } satisfies User;
+
+    const isJustineAnAdult = isAdult(justine);
+    ```
+  </Step>
+  <Step title="Install TypeScript locally">
+    In this example we're going to use npm. You can check [our introduction to the npm package manager](/package-management/an-introduction-to-the-npm-package-manager) for more information.
+
+    ```bash
+    npm i -D typescript # -D is a shorthand for --save-dev
+    ```
+  </Step>
+  <Step title="Compile your TypeScript code">
+    Compile your TypeScript code to JavaScript using the `tsc` command:
+
+    ```bash
+    npx tsc example.ts
+    ```
+
+    <Note>
+      `npx` is a tool that allows you to run Node.js packages without installing them globally.
+    </Note>
+
+    `tsc` is the TypeScript compiler which will take our TypeScript code and compile it to JavaScript. This command will result in a new file named `example.js` that we can run using Node.js.
+  </Step>
+  <Step title="Run your JavaScript code">
+    ```bash
+    node example.js
+    ```
+
+    You should see the output of your TypeScript code in the terminal.
+  </Step>
+</Steps>
+
+## If there are type errors
+
+If you have type errors in your TypeScript code, the TypeScript compiler will catch them and prevent you from running the code. For example, if you change the `age` property of `justine` to a string, TypeScript will throw an error.
+
+We will modify our code like this, to voluntarily introduce a type error:
+
+```typescript
+type User = {
+  name: string;
+  age: number;
+};
+
+function isAdult(user: User): boolean {
+  return user.age >= 18;
+}
+
+const justine: User = {
+  name: 'Justine',
+  age: 'Secret!',
+  // Error: Type 'string' is not assignable to type 'number'.
+};
+
+const isJustineAnAdult: string = isAdult(justine, "I shouldn't be here!");
+// Error: Expected 1 arguments, but got 2.
+// Error: Type 'boolean' is not assignable to type 'string'.
+```
+
+<Tip>
+  As you can see, TypeScript is very helpful in catching bugs before they even happen. This is one of the reasons why TypeScript is so popular among developers.
+</Tip>

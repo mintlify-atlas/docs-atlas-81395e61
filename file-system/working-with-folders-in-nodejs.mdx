@@ -1,0 +1,273 @@
+---
+title: 'Working with folders in Node.js'
+description: 'Learn how to create, read, rename, and remove folders in Node.js using the built-in fs module, including callback, synchronous, and promise-based APIs.'
+---
+
+The Node.js `fs` core module provides many handy methods you can use to work with folders.
+
+## Check if a folder exists
+
+Use `fs.access()` (and its promise-based `fsPromises.access()` counterpart) to check if the folder exists and Node.js can access it with its permissions.
+
+## Create a new folder
+
+Use `fs.mkdir()`, `fs.mkdirSync()`, or `fsPromises.mkdir()` to create a new folder.
+
+<Tabs>
+  <Tab title="ESM">
+    ```javascript
+    import fs from 'node:fs';
+
+    const folderName = '/Users/joe/test';
+
+    try {
+      if (!fs.existsSync(folderName)) {
+        fs.mkdirSync(folderName);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    ```
+  </Tab>
+  <Tab title="CJS">
+    ```javascript
+    const fs = require('node:fs');
+
+    const folderName = '/Users/joe/test';
+
+    try {
+      if (!fs.existsSync(folderName)) {
+        fs.mkdirSync(folderName);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Read the content of a directory
+
+Use `fs.readdir()`, `fs.readdirSync()`, or `fsPromises.readdir()` to read the contents of a directory.
+
+This piece of code reads the content of a folder, both files and subfolders, and returns their relative path:
+
+<Tabs>
+  <Tab title="ESM">
+    ```javascript
+    import fs from 'node:fs';
+
+    const folderPath = '/Users/joe';
+
+    fs.readdirSync(folderPath);
+    ```
+  </Tab>
+  <Tab title="CJS">
+    ```javascript
+    const fs = require('node:fs');
+
+    const folderPath = '/Users/joe';
+
+    fs.readdirSync(folderPath);
+    ```
+  </Tab>
+</Tabs>
+
+You can get the full path:
+
+```javascript
+fs.readdirSync(folderPath).map(fileName => {
+  return path.join(folderPath, fileName);
+});
+```
+
+You can also filter the results to only return the files, and exclude the folders:
+
+<Tabs>
+  <Tab title="ESM">
+    ```javascript
+    import fs from 'node:fs';
+
+    const isFile = fileName => {
+      return fs.lstatSync(fileName).isFile();
+    };
+
+    fs.readdirSync(folderPath)
+      .map(fileName => {
+        return path.join(folderPath, fileName);
+      })
+      .filter(isFile);
+    ```
+  </Tab>
+  <Tab title="CJS">
+    ```javascript
+    const fs = require('node:fs');
+
+    const isFile = fileName => {
+      return fs.lstatSync(fileName).isFile();
+    };
+
+    fs.readdirSync(folderPath)
+      .map(fileName => {
+        return path.join(folderPath, fileName);
+      })
+      .filter(isFile);
+    ```
+  </Tab>
+</Tabs>
+
+## Rename a folder
+
+Use `fs.rename()`, `fs.renameSync()`, or `fsPromises.rename()` to rename a folder. The first parameter is the current path, the second is the new path:
+
+<Tabs>
+  <Tab title="ESM">
+    ```javascript
+    import fs from 'node:fs';
+
+    fs.rename('/Users/joe', '/Users/roger', err => {
+      if (err) {
+        console.error(err);
+      }
+      // done
+    });
+    ```
+  </Tab>
+  <Tab title="CJS">
+    ```javascript
+    const fs = require('node:fs');
+
+    fs.rename('/Users/joe', '/Users/roger', err => {
+      if (err) {
+        console.error(err);
+      }
+      // done
+    });
+    ```
+  </Tab>
+</Tabs>
+
+`fs.renameSync()` is the synchronous version:
+
+<Tabs>
+  <Tab title="ESM">
+    ```javascript
+    import fs from 'node:fs';
+
+    try {
+      fs.renameSync('/Users/joe', '/Users/roger');
+    } catch (err) {
+      console.error(err);
+    }
+    ```
+  </Tab>
+  <Tab title="CJS">
+    ```javascript
+    const fs = require('node:fs');
+
+    try {
+      fs.renameSync('/Users/joe', '/Users/roger');
+    } catch (err) {
+      console.error(err);
+    }
+    ```
+  </Tab>
+</Tabs>
+
+`fsPromises.rename()` is the promise-based version:
+
+<Tabs>
+  <Tab title="ESM">
+    ```javascript
+    import fs from 'node:fs/promises';
+
+    try {
+      await fs.rename('/Users/joe', '/Users/roger');
+    } catch (err) {
+      console.log(err);
+    }
+    ```
+  </Tab>
+  <Tab title="CJS">
+    ```javascript
+    const fs = require('node:fs/promises');
+
+    async function example() {
+      try {
+        await fs.rename('/Users/joe', '/Users/roger');
+      } catch (err) {
+        console.log(err);
+      }
+    }
+    example();
+    ```
+  </Tab>
+</Tabs>
+
+## Remove a folder
+
+Use `fs.rmdir()`, `fs.rmdirSync()`, or `fsPromises.rmdir()` to remove a folder.
+
+<Tabs>
+  <Tab title="ESM">
+    ```javascript
+    import fs from 'node:fs';
+
+    fs.rmdir(dir, err => {
+      if (err) {
+        throw err;
+      }
+
+      console.log(`${dir} is deleted!`);
+    });
+    ```
+  </Tab>
+  <Tab title="CJS">
+    ```javascript
+    const fs = require('node:fs');
+
+    fs.rmdir(dir, err => {
+      if (err) {
+        throw err;
+      }
+
+      console.log(`${dir} is deleted!`);
+    });
+    ```
+  </Tab>
+</Tabs>
+
+To remove a folder that has contents, use `fs.rm()` with the option `{ recursive: true }` to recursively remove the contents.
+
+<Tip>
+  `{ recursive: true, force: true }` makes it so that exceptions will be ignored if the folder does not exist.
+</Tip>
+
+<Tabs>
+  <Tab title="ESM">
+    ```javascript
+    import fs from 'node:fs';
+
+    fs.rm(dir, { recursive: true, force: true }, err => {
+      if (err) {
+        throw err;
+      }
+
+      console.log(`${dir} is deleted!`);
+    });
+    ```
+  </Tab>
+  <Tab title="CJS">
+    ```javascript
+    const fs = require('node:fs');
+
+    fs.rm(dir, { recursive: true, force: true }, err => {
+      if (err) {
+        throw err;
+      }
+
+      console.log(`${dir} is deleted!`);
+    });
+    ```
+  </Tab>
+</Tabs>

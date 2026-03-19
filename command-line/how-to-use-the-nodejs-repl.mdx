@@ -1,0 +1,168 @@
+---
+title: 'How to use the Node.js REPL'
+description: 'Explore the Node.js built-in REPL environment for interactive JavaScript execution, including dot commands, special variables, and programmatic usage.'
+---
+
+## What is the Node.js REPL?
+
+Node.js comes with a built-in REPL (Read-Eval-Print Loop) environment that allows you to execute JavaScript code interactively. The REPL is accessible through the terminal and is a great way to test out small pieces of code.
+
+<Info>
+`REPL` stands for Read Evaluate Print Loop. It is a programming language environment (basically a console window) that takes a single expression as user input and returns the result back to the console after execution. The REPL session provides a convenient way to quickly test simple JavaScript code.
+</Info>
+
+## Starting the REPL
+
+The `node` command is used to run Node.js scripts:
+
+```bash
+node script.js
+```
+
+If you run the `node` command without any script or arguments, it starts a REPL session:
+
+```bash
+node
+```
+
+Your terminal will enter idle mode and wait for input:
+
+```bash
+❯ node
+>
+```
+
+## Using the REPL
+
+The REPL waits for you to enter JavaScript code. Start with something simple:
+
+```console
+> console.log('test')
+test
+undefined
+>
+```
+
+The first value, `test`, is the output printed to the console. Then `undefined` is the return value of running `console.log()`. Node read this line of code, evaluated it, printed the result, and then went back to waiting for more lines. Node loops through these three steps for every piece of code executed in the REPL until you exit the session — that is where the REPL got its name.
+
+Node automatically prints the result of any line of JavaScript code without the need to instruct it to do so:
+
+```console
+> 5 === '5'
+false
+>
+```
+
+<Note>
+The REPL printed `undefined` after executing `console.log()`, while it printed the result directly for `5 === '5'`. The former is a statement; the latter is an expression.
+</Note>
+
+### Multi-line mode
+
+In some cases, code you want to test might need multiple lines. The REPL is smart enough to detect this automatically. For example, start typing a function definition and press enter:
+
+```console
+function generateRandom() {
+...
+```
+
+The Node REPL goes into multi-line mode. Finish your function definition and press enter:
+
+```console
+function generateRandom() {
+...return Math.random()
+}
+undefined
+```
+
+## Special features
+
+### The `_` special variable
+
+If after some code you type `_`, it prints the result of the last operation.
+
+### The up arrow key
+
+Pressing the `up` arrow key gives you access to the history of the previous lines of code executed in the current, and even previous, REPL sessions.
+
+## Dot commands
+
+The REPL has special commands, all starting with a dot (`.`):
+
+| Command | Description |
+| --- | --- |
+| `.help` | Shows the dot commands help |
+| `.editor` | Enables editor mode to write multiline JavaScript code with ease. Press `ctrl-D` to run the code. |
+| `.break` | When inputting a multi-line expression, aborts further input. Same as pressing `ctrl-C`. |
+| `.clear` | Resets the REPL context to an empty object and clears any multi-line expression currently being input. |
+| `.load` | Loads a JavaScript file relative to the current working directory |
+| `.save` | Saves all you entered in the REPL session to a file (specify the filename) |
+| `.exit` | Exits the REPL (same as pressing `ctrl-C` two times) |
+
+The REPL knows when you are typing a multi-line statement without the need to invoke `.editor`. For example, if you start typing an iteration:
+
+```console
+[1, 2, 3].forEach(num => {
+```
+
+and press `enter`, the REPL goes to a new line starting with 3 dots, indicating you can continue working on that block:
+
+```console
+... console.log(num)
+... })
+```
+
+If you type `.break` at the end of a line, multi-line mode will stop and the statement will not be executed.
+
+## Run REPL from a JavaScript file
+
+You can import the REPL module in a JavaScript file to start a REPL session programmatically:
+
+<Tabs>
+  <Tab title="ESM">
+    ```javascript
+    import repl from 'node:repl';
+    ```
+  </Tab>
+  <Tab title="CJS">
+    ```javascript
+    const repl = require('node:repl');
+    ```
+  </Tab>
+</Tabs>
+
+To start the REPL command prompt:
+
+```javascript
+repl.start();
+```
+
+Run the file from the command line:
+
+```bash
+node repl.js
+```
+
+```console
+> const n = 10
+```
+
+You can pass a string to display as the prompt when the REPL starts. The default is `'> '` (with a trailing space), but you can define a custom prompt:
+
+```javascript
+// a Unix style prompt
+const local = repl.start('$ ');
+```
+
+You can also display a message when the user exits the REPL:
+
+```javascript
+local.on('exit', () => {
+  console.log('exiting repl');
+  process.exit();
+});
+```
+
+<Tip>
+You can read more about the REPL module in the [repl documentation](https://nodejs.org/api/repl.html).
+</Tip>

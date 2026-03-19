@@ -1,97 +1,91 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Node.js Learn"
+description: "Official Node.js learning guides — from your first script to advanced async patterns, diagnostics, and TypeScript."
 ---
 
-## Setting up
-
-Get your documentation site up and running in minutes.
-
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Introduction to Node.js" icon="node-js" href="/getting-started/introduction-to-nodejs">
+    Understand what Node.js is, how it works, and build your first HTTP server.
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Asynchronous Work" icon="rotate" href="/asynchronous-work/asynchronous-flow-control">
+    Master the event loop, callbacks, promises, streams, and non-blocking I/O.
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Command Line" icon="terminal" href="/command-line/run-nodejs-scripts-from-the-command-line">
+    Run scripts, use the REPL, read environment variables, and handle I/O.
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="File System" icon="folder-open" href="/file-system/nodejs-file-paths">
+    Read, write, and manage files and directories with Node.js built-ins.
   </Card>
-</Columns>
+  <Card title="HTTP & Networking" icon="globe" href="/http/anatomy-of-an-http-transaction">
+    Work with HTTP transactions, the Fetch API, WebSockets, and proxies.
+  </Card>
+  <Card title="Package Management" icon="box" href="/package-management/an-introduction-to-the-npm-package-manager">
+    Use npm, publish packages, and understand ABI stability for native modules.
+  </Card>
+  <Card title="Diagnostics" icon="stethoscope" href="/diagnostics/user-journey">
+    Debug, profile, analyze memory, and generate flame graphs.
+  </Card>
+  <Card title="Security" icon="shield-halved" href="/security/security-best-practices">
+    Apply Node.js security best practices to protect your applications.
+  </Card>
+  <Card title="Testing" icon="flask" href="/testing/introduction">
+    Write tests, mock dependencies, and collect code coverage with the built-in test runner.
+  </Card>
+  <Card title="TypeScript" icon="code" href="/typescript/introduction">
+    Run TypeScript with Node.js — natively, via transpilation, or with ts-node.
+  </Card>
+</CardGroup>
 
-## Create beautiful pages
+## What is Node.js?
 
-Everything you need to create world-class documentation.
+Node.js is an open-source, cross-platform JavaScript runtime built on the [V8 engine](https://v8.dev/) that powers Google Chrome. It executes JavaScript outside the browser, enabling server-side development with the same language you use on the frontend.
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+Node.js uses a **non-blocking, event-driven architecture** that handles thousands of concurrent connections in a single process — without the complexity of thread management.
 
-## Need inspiration?
+```javascript server.js
+import { createServer } from 'node:http';
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+const hostname = '127.0.0.1';
+const port = 3000;
+
+const server = createServer((req, res) => {
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'text/plain');
+  res.end('Hello World');
+});
+
+server.listen(port, hostname, () => {
+  console.log(`Server running at http://${hostname}:${port}/`);
+});
+```
+
+<Steps>
+  <Step title="Install Node.js">
+    Download and install Node.js from [nodejs.org](https://nodejs.org/en/download).
+  </Step>
+  <Step title="Create a script">
+    Save the code above as `server.js`.
+  </Step>
+  <Step title="Run it">
+    ```bash
+    node server.js
+    ```
+  </Step>
+  <Step title="Open in your browser">
+    Visit `http://127.0.0.1:3000` to see **Hello World**.
+  </Step>
+</Steps>
+
+## Learning path
+
+New to Node.js? Work through the guides in order:
+
+1. **[Introduction to Node.js](/getting-started/introduction-to-nodejs)** — understand the runtime and its unique advantages
+2. **[How much JavaScript do you need?](/getting-started/how-much-javascript-do-you-need-to-know-to-use-nodejs)** — assess your prerequisite knowledge
+3. **[Differences from the browser](/getting-started/differences-between-nodejs-and-the-browser)** — key distinctions for browser developers
+4. **[Asynchronous flow control](/asynchronous-work/asynchronous-flow-control)** — the core of effective Node.js programming
+5. **[Don't block the event loop](/asynchronous-work/dont-block-the-event-loop)** — the most critical rule in Node.js
+
+<Tip>
+  These guides are sourced from the Node.js community and reflect current best practices. They cover Node.js LTS releases.
+</Tip>

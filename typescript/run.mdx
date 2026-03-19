@@ -1,0 +1,56 @@
+---
+title: Running TypeScript with a runner
+description: Use ts-node or tsx to run TypeScript code directly in Node.js without manual compilation.
+---
+
+If you want more advanced processing of TypeScript than the built-in support (or you're using Node.js prior to v22.7.0), you have two options: use a runner (which handles much of the complexity for you), or handle it all yourself via [transpilation](/typescript/transpile).
+
+## Running TypeScript code with `ts-node`
+
+[ts-node](https://typestrong.org/ts-node/) is a TypeScript execution environment for Node.js. It allows you to run TypeScript code directly in Node.js without the need to compile it first. By default, `ts-node` performs type checking unless `transpileOnly` is enabled.
+
+<Note>
+  While `ts-node` can catch type errors at runtime, we still recommend type-checking your code first with `tsc` before shipping it.
+</Note>
+
+<Steps>
+  <Step title="Install ts-node">
+    ```bash
+    npm i -D ts-node
+    ```
+  </Step>
+  <Step title="Run your TypeScript file">
+    ```bash
+    npx ts-node example.ts
+    ```
+  </Step>
+</Steps>
+
+## Running TypeScript code with `tsx`
+
+[tsx](https://tsx.is/) is another TypeScript execution environment for Node.js. It allows you to run TypeScript code directly in Node.js without the need to compile it first.
+
+<Warning>
+  `tsx` does not type check your code. We recommend type checking your code first with `tsc` and then running it with `tsx` before shipping it.
+</Warning>
+
+<Steps>
+  <Step title="Install tsx">
+    ```bash
+    npm i -D tsx
+    ```
+  </Step>
+  <Step title="Run your TypeScript file">
+    ```bash
+    npx tsx example.ts
+    ```
+  </Step>
+</Steps>
+
+### Registering `tsx` via `node`
+
+If you want to use `tsx` via `node`, you can register `tsx` via `--import`:
+
+```bash
+node --import=tsx example.ts
+```

@@ -1,0 +1,1074 @@
+---
+title: 'Profiling Node.js applications'
+description: 'Use the built-in V8 tick profiler and Linux perf to identify CPU bottlenecks, diagnose memory issues, and optimize Node.js application performance.'
+---
+
+Profiling a Node.js application involves measuring its performance by analyzing
+the CPU, memory, and other runtime metrics while the application is running.
+This helps in identifying bottlenecks, high CPU usage, memory leaks, or slow
+function calls that may impact the application's efficiency, responsiveness,
+and scalability.
+
+## Poor performance
+
+### Symptoms
+
+Your application's latency is high and you have already confirmed that the
+bottleneck is not in dependencies like databases or downstream services. You
+suspect your application spends significant time running code or processing
+information.
+
+You may also be satisfied with general performance but want to understand which
+parts of the application can be improved to run faster or more efficiently —
+for example, to improve user experience or reduce computation cost.
+
+### What to do
+
+In this scenario, you are interested in code that uses more CPU cycles than
+others. This document covers two approaches:
+
+<CardGroup cols={2}>
+  <Card title="V8 sampling profiler" icon="chart-line" href="#v8-sampling-profiler">
+    Built-in profiler using `--prof`. Best for a quick, portable first look at
+    CPU usage.
+  </Card>
+  <Card title="Linux perf" icon="linux" href="#linux-perf">
+    Low-level CPU profiling with JavaScript, native, and OS-level frames.
+    Linux only.
+  </Card>
+</CardGroup>
+
+## V8 sampling profiler
+
+There are many third-party tools available for profiling Node.js applications,
+but in many cases, the easiest option is to use the Node.js built-in profiler.
+The built-in profiler uses the [profiler inside V8](https://v8.dev/docs/profile),
+which samples the stack at regular intervals during program execution. It records
+the results of these samples, along with important optimization events such as
+JIT compiles, as a series of ticks:
+
+```
+code-creation,LazyCompile,0,0x2d5000a337a0,396,"bp native array.js:1153:16",0x289f644df68,~
+code-creation,LazyCompile,0,0x2d5000a33940,716,"hasOwnProperty native v8natives.js:198:30",0x289f64438d0,~
+code-creation,LazyCompile,0,0x2d5000a33c20,284,"ToName native runtime.js:549:16",0x289f643bb28,~
+code-creation,Stub,2,0x2d5000a33d40,182,"DoubleToIStub"
+code-creation,Stub,2,0x2d5000a33e00,507,"NumberToStringStub"
+```
+
+Since Node.js 4.4.0, tools have been introduced that let you interpret this
+output without building V8 from source.
+
+### Example application
+
+To illustrate the tick profiler, consider a simple Express application with two
+handlers — one for adding new users:
+
+```javascript
+app.get('/newUser', (req, res) => {
+  let username = req.query.username || '';
+  const password = req.query.password || '';
+
+  username = username.replace(/[^a-zA-Z0-9]/g, '');
+
+  if (!username || !password || users[username]) {
+    return res.sendStatus(400);
+  }
+
+  const salt = crypto.randomBytes(128).toString('base64');
+  const hash = crypto.pbkdf2Sync(password, salt, 10000, 512, 'sha512');
+
+  users[username] = { salt, hash };
+
+  res.sendStatus(200);
+});
+```
+
+And one for validating user authentication attempts:
+
+```javascript
+app.get('/auth', (req, res) => {
+  let username = req.query.username || '';
+  const password = req.query.password || '';
+
+  username = username.replace(/[^a-zA-Z0-9]/g, '');
+
+  if (!username || !password || !users[username]) {
+    return res.sendStatus(400);
+  }
+
+  const { salt, hash } = users[username];
+  const encryptHash = crypto.pbkdf2Sync(password, salt, 10000, 512, 'sha512');
+
+  if (crypto.timingSafeEqual(hash, encryptHash)) {
+    res.sendStatus(200);
+  } else {
+    res.sendStatus(401);
+  }
+});
+```
+
+<Note>
+  These handlers are not recommended patterns for authenticating users in
+  production. They are used purely for illustration. Do not design your own
+  cryptographic authentication mechanisms — use existing, proven solutions.
+</Note>
+
+### Running the profiler
+
+Assume users are complaining about high latency. Run the app with the built-in
+profiler:
+
+```bash
+NODE_ENV=production node --prof app.js
+```
+
+Put some load on the server using `ab` (ApacheBench):
+
+```bash
+curl -X GET "http://localhost:8080/newUser?username=matt&password=password"
+ab -k -c 20 -n 250 "http://localhost:8080/auth?username=matt&password=password"
+```
+
+A typical `ab` output showing the performance problem:
+
+```
+Concurrency Level:      20
+Time taken for tests:   46.932 seconds
+Complete requests:      250
+Failed requests:        0
+Keep-Alive requests:    250
+Total transferred:      50250 bytes
+HTML transferred:       500 bytes
+Requests per second:    5.33 [#/sec] (mean)
+Time per request:       3754.556 [ms] (mean)
+Time per request:       187.728 [ms] (mean, across all concurrent requests)
+Transfer rate:          1.05 [Kbytes/sec] received
+
+...
+
+Percentage of the requests served within a certain time (ms)
+  50%   3755
+  66%   3804
+  75%   3818
+  80%   3825
+  90%   3845
+  95%   3858
+  98%   3874
+  99%   3875
+ 100%   4225 (longest request)
+```
+
+About 5 requests per second with an average round-trip of nearly 4 seconds.
+
+### Processing the tick file
+
+Running with `--prof` generates a tick file named
+`isolate-0xnnnnnnnnnnnn-v8.log` in the current directory. Process it with
+`--prof-process`:
+
+```bash
+node --prof-process isolate-0xnnnnnnnnnnnn-v8.log > processed.txt
+```
+
+Open `processed.txt` in a text editor. First, look at the summary section:
+
+```
+ [Summary]:
+   ticks  total  nonlib   name
+     79    0.2%    0.2%  JavaScript
+  36703   97.2%   99.2%  C++
+      7    0.0%    0.0%  GC
+    767    2.0%          Shared libraries
+    215    0.6%          Unaccounted
+```
+
+97% of all samples occurred in C++ code. Next, look at the `[C++]` section:
+
+```
+ [C++]:
+   ticks  total  nonlib   name
+  19557   51.8%   52.9%  node::crypto::PBKDF2(v8::FunctionCallbackInfo<v8::Value> const&)
+   4510   11.9%   12.2%  _sha1_block_data_order
+   3165    8.4%    8.6%  _malloc_zone_malloc
+```
+
+The top 3 entries account for 72.1% of CPU time. Over 51.8% is consumed by
+`PBKDF2`, which corresponds to hash generation from user passwords.
+
+To understand the call relationships, examine the `[Bottom up (heavy) profile]`
+section:
+
+```
+   ticks parent  name
+  19557   51.8%  node::crypto::PBKDF2(v8::FunctionCallbackInfo<v8::Value> const&)
+  19557  100.0%    v8::internal::Builtins::~Builtins()
+  19557  100.0%      LazyCompile: ~pbkdf2 crypto.js:557:16
+
+   4510   11.9%  _sha1_block_data_order
+   4510  100.0%    LazyCompile: *pbkdf2 crypto.js:557:16
+   4510  100.0%      LazyCompile: *exports.pbkdf2Sync crypto.js:552:30
+
+   3165    8.4%  _malloc_zone_malloc
+   3161   99.9%    LazyCompile: *pbkdf2 crypto.js:557:16
+   3161  100.0%      LazyCompile: *exports.pbkdf2Sync crypto.js:552:30
+```
+
+The `parent` column percentage tells you the percentage of samples for which
+the function in the row above was called by the function in the current row.
+Here, `_sha1_block_data_order` and `_malloc_zone_malloc` were both called
+almost exclusively by `pbkdf2`. This means password-based hash generation
+accounts for all CPU time in the top 3 most sampled functions.
+
+### Fixing the bottleneck
+
+The password hash is computed synchronously, blocking the event loop and
+preventing other incoming requests from being handled. Switch to the
+asynchronous version of `pbkdf2`:
+
+```javascript
+app.get('/auth', (req, res) => {
+  let username = req.query.username || '';
+  const password = req.query.password || '';
+
+  username = username.replace(/[^a-zA-Z0-9]/g, '');
+
+  if (!username || !password || !users[username]) {
+    return res.sendStatus(400);
+  }
+
+  crypto.pbkdf2(
+    password,
+    users[username].salt,
+    10000,
+    512,
+    'sha512',
+    (err, hash) => {
+      if (users[username].hash.toString() === hash.toString()) {
+        res.sendStatus(200);
+      } else {
+        res.sendStatus(401);
+      }
+    }
+  );
+});
+```
+
+A new `ab` run with the asynchronous version yields:
+
+```
+Concurrency Level:      20
+Time taken for tests:   12.846 seconds
+Complete requests:      250
+Failed requests:        0
+Keep-Alive requests:    250
+Total transferred:      50250 bytes
+HTML transferred:       500 bytes
+Requests per second:    19.46 [#/sec] (mean)
+Time per request:       1027.689 [ms] (mean)
+Time per request:       51.384 [ms] (mean, across all concurrent requests)
+Transfer rate:          3.82 [Kbytes/sec] received
+
+...
+
+Percentage of the requests served within a certain time (ms)
+  50%   1018
+  66%   1035
+  75%   1041
+  80%   1043
+  90%   1049
+  95%   1063
+  98%   1070
+  99%   1071
+ 100%   1079 (longest request)
+```
+
+The app now serves about 20 requests per second — roughly 4 times more than
+before — and average latency dropped from 4 seconds to just over 1 second.
+
+<Tip>
+  You may also find [how to create a flame graph](/diagnostics/flame-graphs)
+  helpful for visualizing the CPU profile.
+</Tip>
+
+## Linux perf
+
+[Linux perf](https://perf.wiki.kernel.org/index.php/Main_Page) provides low-level
+CPU profiling with JavaScript, native, and OS-level frames.
+
+<Warning>
+  This section applies to Linux only.
+</Warning>
+
+Linux perf is usually available through the `linux-tools-common` package.
+Through either `--perf-basic-prof` or `--perf-basic-prof-only-functions` you
+can start a Node.js application that supports `perf_events`.
+
+<Note>
+  `--perf-basic-prof` always writes to a file (`/tmp/perf-PID.map`), which can
+  lead to unbounded disk growth. If that's a concern, use the
+  [linux-perf](https://www.npmjs.com/package/linux-perf) module or
+  `--perf-basic-prof-only-functions` instead. The latter produces less output
+  and is a viable option for production profiling.
+</Note>
+
+### How to use Linux perf
+
+<Steps>
+  <Step title="Launch the application">
+    Start your app with perf support and note the PID:
+
+    ```console
+    $ node --perf-basic-prof-only-functions index.js &
+    [1] 3870
+    ```
+  </Step>
+  <Step title="Record events">
+    Record events at the desired frequency. You may want to run a load test
+    during this step to generate more records for reliable analysis. Close the
+    perf process with `Ctrl-C` when done:
+
+    ```console
+    $ sudo perf record -F 99 -p 3870 -g
+    ```
+  </Step>
+  <Step title="Aggregate results">
+    Export the trace data to a file:
+
+    ```console
+    $ sudo perf script > perfs.out
+    ```
+
+    The raw output looks like:
+
+    ```console
+    $ cat ./perfs.out
+    node 3870 25147.878454:          1 cycles:
+            ffffffffb5878b06 native_write_msr+0x6 ([kernel.kallsyms])
+            ffffffffb580d9d5 intel_tfa_pmu_enable_all+0x35 ([kernel.kallsyms])
+            ffffffffb5807ac8 x86_pmu_enable+0x118 ([kernel.kallsyms])
+            ffffffffb5a0a93d perf_pmu_enable.part.0+0xd ([kernel.kallsyms])
+            ffffffffb5a10c06 __perf_event_task_sched_in+0x186 ([kernel.kallsyms])
+            ffffffffb58d3e1d finish_task_switch+0xfd ([kernel.kallsyms])
+            ffffffffb62d46fb __sched_text_start+0x2eb ([kernel.kallsyms])
+            ffffffffb62d4b92 schedule+0x42 ([kernel.kallsyms])
+            ffffffffb62d87a9 schedule_hrtimeout_range_clock+0xf9 ([kernel.kallsyms])
+            ffffffffb62d87d3 schedule_hrtimeout_range+0x13 ([kernel.kallsyms])
+            ffffffffb5b35980 ep_poll+0x400 ([kernel.kallsyms])
+            ffffffffb5b35a88 do_epoll_wait+0xb8 ([kernel.kallsyms])
+            ffffffffb5b35abe __x64_sys_epoll_wait+0x1e ([kernel.kallsyms])
+            ffffffffb58044c7 do_syscall_64+0x57 ([kernel.kallsyms])
+            ffffffffb640008c entry_SYSCALL_64_after_hwframe+0x44 ([kernel.kallsyms])
+    ....
+    ```
+  </Step>
+  <Step title="Generate a flame graph">
+    The raw output is hard to read. Generate a flame graph for better
+    visualization. Follow [the flame graph guide](/diagnostics/flame-graphs#create-a-flame-graph-with-system-perf-tools)
+    from step 6.
+  </Step>
+</Steps>
+
+### Useful links
+
+- [Flame graphs](/diagnostics/flame-graphs)
+- [Node.js flame graphs on Linux](https://www.brendangregg.com/blog/2014-09-17/node-flame-graphs-on-linux.html)
+- [Linux perf wiki](https://perf.wiki.kernel.org/index.php/Main_Page)
+- [Node CPU profiler](https://blog.rafaelgss.com.br/node-cpu-profiler)
+
+## Memory diagnostics
+
+Node.js (JavaScript) is a garbage-collected language, so memory leaks are
+possible through retainers. As Node.js applications are usually multi-tenant,
+business-critical, and long-running, finding and fixing memory issues is
+essential.
+
+### My process runs out of memory
+
+**Symptoms:** Continuously increasing memory usage (which can be fast or slow,
+over days or even weeks), followed by the process crashing and restarting.
+The process may run slower than before and restarts may cause some requests
+to fail (load balancer responds with 502).
+
+**Side effects:**
+- Process restarts due to memory exhaustion; requests are dropped
+- Increased GC activity leads to higher CPU usage and slower response time
+- GC blocks the event loop, causing slowness
+- Increased memory swapping slows down the process
+- May not have enough available memory to get a heap snapshot
+
+### My process utilizes memory inefficiently
+
+**Symptoms:** The application uses an unexpected amount of memory and/or you
+observe elevated garbage collector activity.
+
+**Side effects:**
+- An elevated number of page faults
+- Higher GC activity and CPU usage
+
+### Debugging memory issues
+
+Most memory issues can be solved by determining how much space a specific
+type of object takes and what variables prevent it from being garbage collected.
+Knowing the allocation pattern of your program over time also helps.
+
+<CardGroup cols={2}>
+  <Card title="Heap profiler" icon="chart-area" href="#heap-profiler">
+    Capture allocations over time using Allocation Timeline or Sampling Heap
+    Profiler.
+  </Card>
+  <Card title="Heap snapshot" icon="camera" href="#heap-snapshot">
+    Take a snapshot of the heap and inspect it in Chrome DevTools. Compare two
+    snapshots to find leaks.
+  </Card>
+  <Card title="GC traces" icon="recycle" href="#tracing-garbage-collection">
+    Use `--trace-gc` to observe garbage collection events and identify memory
+    leaks or excessive GC overhead.
+  </Card>
+  <Card title="Understanding memory" icon="book" href="#understanding-and-tuning-memory">
+    Learn how V8 manages memory and use command-line flags to fine-tune heap
+    sizes and GC behavior.
+  </Card>
+</CardGroup>
+
+## Heap profiler
+
+The heap profiler acts on top of V8 to capture allocations over time. Unlike
+heap snapshots, which capture a point-in-time view, heap profiling lets you
+understand allocations over a period of time.
+
+### Allocation timeline
+
+The Allocation Timeline traces every allocation. It has higher overhead than
+the Sampling Heap Profiler so it is not recommended for use in production.
+
+<Note>
+  You can use [@mmarchini/observe](https://www.npmjs.com/package/@mmarchini/observe)
+  to start and stop the profiler programmatically.
+</Note>
+
+<Steps>
+  <Step title="Start the application">
+    ```console
+    node --inspect index.js
+    ```
+
+    <Tip>`--inspect-brk` is a better choice for scripts.</Tip>
+  </Step>
+  <Step title="Open Chrome DevTools Memory tab">
+    Connect to the DevTools instance in Chrome, select the **Memory** tab, then
+    select **Allocation instrumentation timeline** and start profiling.
+  </Step>
+  <Step title="Generate load">
+    Run samples to identify memory issues. For example, use Apache Benchmark:
+
+    ```console
+    $ ab -n 1000 -c 5 http://localhost:3000
+    ```
+  </Step>
+  <Step title="Stop and inspect">
+    Press the stop button when the load is complete and review the snapshot data.
+  </Step>
+</Steps>
+
+### Sampling heap profiler
+
+The Sampling Heap Profiler tracks the memory allocation pattern and reserved
+space over time. Because it is sampling-based, its overhead is low enough for
+use in production systems.
+
+<Note>
+  You can use the [`heap-profiler`](https://www.npmjs.com/package/heap-profile)
+  module to start and stop the heap profiler programmatically.
+</Note>
+
+<Steps>
+  <Step title="Start the application">
+    ```console
+    $ node --inspect index.js
+    ```
+
+    <Tip>`--inspect-brk` is a better choice for scripts.</Tip>
+  </Step>
+  <Step title="Open Chrome DevTools Memory tab">
+    Connect to the DevTools instance, then:
+    1. Select the **Memory** tab.
+    2. Select **Allocation sampling**.
+    3. Start profiling.
+  </Step>
+  <Step title="Generate load and stop">
+    Produce some load and stop the profiler. It will generate a summary with
+    allocations grouped by their stack traces. Focus on the functions with the
+    most heap allocations.
+  </Step>
+</Steps>
+
+**Useful links:**
+- [Memory terminology](https://developer.chrome.com/docs/devtools/memory-problems/memory-101/)
+- [Allocation profiler](https://developer.chrome.com/docs/devtools/memory-problems/allocation-profiler/)
+
+## Heap snapshot
+
+You can take a heap snapshot from your running application and load it into
+[Chrome Developer Tools](https://developer.chrome.com/docs/devtools/) to inspect variables or check retainer size.
+You can also compare multiple snapshots to see differences over time.
+
+<Warning>
+  When creating a snapshot, all other work in your main thread is stopped.
+  Depending on the heap contents it could take more than a minute. The snapshot
+  is built in memory, so it can double the heap size — potentially filling up
+  all available memory and crashing the app.
+
+  If you take a heap snapshot in production, make sure the process can crash
+  without impacting your application's availability.
+</Warning>
+
+### Getting a heap snapshot
+
+There are multiple ways to obtain a heap snapshot:
+
+<Tabs>
+  <Tab title="Via inspector">
+    Works in all actively maintained versions of Node.js.
+
+    Run node with `--inspect` and open the inspector. Go to the **Memory** tab
+    and take a heap snapshot.
+  </Tab>
+  <Tab title="Via signal flag">
+    Works in v12.0.0 or later.
+
+    Start node with the `--heapsnapshot-signal` flag:
+
+    ```bash
+    $ node --heapsnapshot-signal=SIGUSR2 index.js
+    ```
+
+    Then send the signal to the process:
+
+    ```bash
+    $ ps aux
+    USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+    node         1  5.5  6.1 787252 247004 ?       Ssl  16:43   0:02 node --heapsnapshot-signal=SIGUSR2 index.js
+    $ kill -USR2 1
+    $ ls
+    Heap.20190718.133405.15554.0.001.heapsnapshot
+    ```
+
+    See the [heapsnapshot-signal flag docs](https://nodejs.org/api/cli.html#--heapsnapshot-signalsignal) for details.
+  </Tab>
+  <Tab title="Via writeHeapSnapshot">
+    Works in v11.13.0 or later. For older versions, use the [heapdump package](https://www.npmjs.com/package/heapdump).
+
+    <CodeGroup>
+    ```javascript CJS
+    require('node:v8').writeHeapSnapshot();
+    ```
+
+    ```javascript ESM
+    import { writeHeapSnapshot } from 'node:v8';
+    writeHeapSnapshot();
+    ```
+    </CodeGroup>
+
+    Call this in an HTTP handler or as a reaction to an OS signal. Do not expose
+    the triggering endpoint publicly. See [`writeHeapSnapshot` docs](https://nodejs.org/api/v8.html#v8writeheapsnapshotfilenameoptions)
+    for file name options.
+  </Tab>
+  <Tab title="Via inspector protocol">
+    The inspector protocol can trigger a heap snapshot from outside the process
+    without running the Chromium inspector.
+
+    Here is an example using `websocat` and `jq`:
+
+    ```bash
+    #!/bin/bash
+    set -e
+
+    kill -USR1 "$1"
+    rm -f fifo out
+    mkfifo ./fifo
+    websocat -B 10000000000 "$(curl -s http://localhost:9229/json | jq -r '.[0].webSocketDebuggerUrl')" < ./fifo > ./out &
+    exec 3>./fifo
+    echo '{"method": "HeapProfiler.enable", "id": 1}' > ./fifo
+    echo '{"method": "HeapProfiler.takeHeapSnapshot", "id": 2}' > ./fifo
+    while jq -e "[.id != 2, .result != {}] | all" < <(tail -n 1 ./out); do
+      sleep 1s
+      echo "Capturing Heap Snapshot..."
+    done
+
+    echo -n "" > ./out.heapsnapshot
+    while read -r line; do
+      f="$(echo "$line" | jq -r '.params.chunk')"
+      echo -n "$f" >> out.heapsnapshot
+      i=$((i+1))
+    done < <(cat out | tail -n +2 | head -n -1)
+
+    exec 3>&-
+    ```
+
+    See also: [OpenProfiling for Node.js](https://github.com/vmarchaud/openprofiling-node)
+  </Tab>
+</Tabs>
+
+### Finding a memory leak with heap snapshots
+
+Compare two snapshots to find a memory leak. Follow these steps to produce a
+clean diff:
+
+<Steps>
+  <Step title="Let the process bootstrap">
+    Let the process load all sources and finish bootstrapping. This should take
+    a few seconds at most.
+  </Step>
+  <Step title="Exercise the suspect functionality">
+    Start using the functionality you suspect is leaking memory. It will likely
+    make some initial allocations that are not the leaking ones.
+  </Step>
+  <Step title="Take the first snapshot">
+    Take one heap snapshot.
+  </Step>
+  <Step title="Continue using the functionality">
+    Continue using the functionality for a while, preferably without running
+    anything else in between.
+  </Step>
+  <Step title="Take the second snapshot">
+    Take another heap snapshot. The difference between the two should mostly
+    contain what is leaking.
+  </Step>
+  <Step title="Compare in Chrome DevTools">
+    Open Chromium/Chrome DevTools and go to the **Memory** tab. Load the older
+    snapshot file first, then the newer one second. Select the newer snapshot
+    and switch the dropdown at the top from **Summary** to **Comparison**. Look
+    for large positive deltas and explore the references in the bottom panel.
+  </Step>
+</Steps>
+
+You can practice capturing heap snapshots and finding memory leaks with [this
+heap snapshot exercise](https://github.com/naugtur/node-example-heapdump).
+
+## Tracing garbage collection
+
+This section covers the fundamentals of garbage collection traces. By the end,
+you will be able to:
+
+- Enable GC traces in your Node.js application
+- Interpret traces
+- Identify potential memory issues
+
+<Note>
+  When GC is running, your code is not. Knowing how often and how long garbage
+  collection runs — and what the outcome is — helps you spot performance
+  problems caused by excessive GC pressure.
+</Note>
+
+### Setup
+
+For the examples in this section, use the following script:
+
+```javascript
+// script.mjs
+
+import os from 'node:os';
+
+let len = 1_000_000;
+const entries = new Set();
+
+function addEntry() {
+  const entry = {
+    timestamp: Date.now(),
+    memory: os.freemem(),
+    totalMemory: os.totalmem(),
+    uptime: os.uptime(),
+  };
+
+  entries.add(entry);
+}
+
+function summary() {
+  console.log(`Total: ${entries.size} entries`);
+}
+
+// execution
+(() => {
+  while (len > 0) {
+    addEntry();
+    process.stdout.write(`~~> ${len} entries to record\r`);
+    len--;
+  }
+
+  summary();
+})();
+```
+
+### Running with GC traces
+
+Use the `--trace-gc` flag to print GC events to the console:
+
+```console
+$ node --trace-gc script.mjs
+```
+
+Output example:
+
+```bash
+[39067:0x158008000]     2297 ms: Scavenge 117.5 (135.8) -> 102.2 (135.8) MB, 0.8 / 0.0 ms  (average mu = 0.994, current mu = 0.994) allocation failure
+[39067:0x158008000]     2375 ms: Scavenge 120.0 (138.3) -> 104.7 (138.3) MB, 0.9 / 0.0 ms  (average mu = 0.994, current mu = 0.994) allocation failure
+[39067:0x158008000]     2453 ms: Scavenge 122.4 (140.8) -> 107.1 (140.8) MB, 0.7 / 0.0 ms  (average mu = 0.994, current mu = 0.994) allocation failure
+[39067:0x158008000]     2531 ms: Scavenge 124.9 (143.3) -> 109.6 (143.3) MB, 0.7 / 0.0 ms  (average mu = 0.994, current mu = 0.994) allocation failure
+Total: 1000000 entries
+```
+
+### Reading a trace line
+
+Each `--trace-gc` line follows this structure:
+
+```bash
+[13973:0x110008000]       44 ms: Scavenge 2.4 (3.2) -> 2.0 (4.2) MB, 0.5 / 0.0 ms  (average mu = 1.000, current mu = 1.000) allocation failure
+```
+
+| Token | Interpretation |
+| --- | --- |
+| `13973` | PID of the running process |
+| `0x110008000` | Isolate (JS heap instance) |
+| `44 ms` | Time since the process started, in ms |
+| `Scavenge` | Type/phase of GC |
+| `2.4` | Heap used before GC, in MB |
+| `(3.2)` | Total heap before GC, in MB |
+| `2.0` | Heap used after GC, in MB |
+| `(4.2)` | Total heap after GC, in MB |
+| `0.5 / 0.0 ms (average mu = 1.000, current mu = 1.000)` | Time spent in GC, in ms |
+| `allocation failure` | Reason for GC |
+
+### GC event types
+
+**Scavenge** collects objects in the "new" space (short-lived objects). The new
+space is designed to be small and fast for garbage collection. Objects not
+collected after two Scavenge operations are promoted to the old space.
+
+**Mark-sweep** collects objects from the "old" space (long-lived objects). It
+operates in two phases:
+- **Mark**: marks living objects as black and dead objects as white.
+- **Sweep**: scans for white objects and converts them to free space.
+
+### Detecting a memory leak
+
+If you see many `Mark-sweep` events where the amount of memory collected after
+each event is insignificant, you likely have a memory leak.
+
+To get context on bad allocations:
+
+<Steps>
+  <Step title="Observe old space growth">
+    Confirm that the old space is continuously increasing.
+  </Step>
+  <Step title="Reduce max-old-space-size">
+    Set `--max-old-space-size` to a value closer to the current heap limit:
+
+    ```bash
+    node --trace-gc --max-old-space-size=50 script.mjs
+    ```
+  </Step>
+  <Step title="Run until OOM">
+    Run the program until it hits an out-of-memory error. The log will show the
+    failing context:
+
+    ```bash
+    <--- Last few GCs --->
+    [40928:0x148008000]      509 ms: Mark-sweep 46.8 (65.8) -> 40.6 (77.3) MB, 6.4 / 0.0 ms  (average mu = 0.977, current mu = 0.977) finalize incremental...
+    FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory
+    ```
+  </Step>
+  <Step title="Interpret the result">
+    If the same OOM pattern repeats after increasing heap size by ~10%, it
+    indicates a memory leak. If there is no OOM, freeze the heap size at that
+    value — a packed heap reduces memory footprint and computation latency.
+  </Step>
+</Steps>
+
+### Detecting slowness from GC
+
+Use these heuristics when reviewing `--trace-gc` output:
+
+1. If the time between two GC events is less than the time spent in GC, the application is severely starving.
+2. If both the time between GC events and the time spent in GC are very high, the application can probably use a smaller heap.
+3. If the time between GC events is much greater than the time spent in GC, the application is relatively healthy.
+
+### Fixing the leak
+
+Instead of accumulating entries in a `Set` in memory, write them to a file:
+
+```javascript
+// script-fix.mjs
+import fs from 'node:fs/promises';
+import os from 'node:os';
+
+let len = 1_000_000;
+const fileName = `entries-${Date.now()}`;
+
+async function addEntry() {
+  const entry = {
+    timestamp: Date.now(),
+    memory: os.freemem(),
+    totalMemory: os.totalmem(),
+    uptime: os.uptime(),
+  };
+  await fs.appendFile(fileName, JSON.stringify(entry) + '\n');
+}
+
+async function summary() {
+  const stats = await fs.lstat(fileName);
+  console.log(`File size ${stats.size} bytes`);
+}
+
+// execution
+(async () => {
+  await fs.writeFile(fileName, '----START---\n');
+  while (len > 0) {
+    await addEntry();
+    process.stdout.write(`~~> ${len} entries to record\r`);
+    len--;
+  }
+
+  await summary();
+})();
+```
+
+Run the fixed script:
+
+```bash
+node --trace-gc script-fix.mjs
+```
+
+You should observe:
+- `Mark-sweep` events appear less frequently.
+- Memory footprint stays below 25 MB versus 130+ MB with the first script.
+
+### Tracing GC programmatically
+
+<Tabs>
+  <Tab title="v8 module">
+    Use the `v8` module to enable or disable GC tracing at runtime without
+    restarting the process:
+
+    ```javascript
+    import v8 from 'v8';
+
+    // enabling trace-gc
+    v8.setFlagsFromString('--trace-gc');
+
+    // disabling trace-gc
+    v8.setFlagsFromString('--notrace-gc');
+    ```
+  </Tab>
+  <Tab title="Performance hooks">
+    Use `PerformanceObserver` to receive GC events as `PerformanceEntry` objects:
+
+    <CodeGroup>
+    ```javascript CJS
+    const { PerformanceObserver } = require('node:perf_hooks');
+
+    // Create a performance observer
+    const obs = new PerformanceObserver(list => {
+      const entry = list.getEntries()[0];
+      /*
+      PerformanceEntry {
+        name: 'gc',
+        entryType: 'gc',
+        startTime: 2820.567669,
+        duration: 1.315709,
+        kind: 1
+      }
+      */
+    });
+
+    // Subscribe to notifications of GCs
+    obs.observe({ entryTypes: ['gc'] });
+
+    // Stop subscription
+    obs.disconnect();
+    ```
+
+    ```javascript ESM
+    import { PerformanceObserver } from 'node:perf_hooks';
+
+    // Create a performance observer
+    const obs = new PerformanceObserver(list => {
+      const entry = list.getEntries()[0];
+      /*
+      PerformanceEntry {
+        name: 'gc',
+        entryType: 'gc',
+        startTime: 2820.567669,
+        duration: 1.315709,
+        kind: 1
+      }
+      */
+    });
+
+    // Subscribe to notifications of GCs
+    obs.observe({ entryTypes: ['gc'] });
+
+    // Stop subscription
+    obs.disconnect();
+    ```
+    </CodeGroup>
+
+    Each `PerformanceEntry` for a GC event contains:
+
+    | Property | Interpretation |
+    | --- | --- |
+    | `name` | The name of the performance entry |
+    | `entryType` | The type of the performance entry |
+    | `startTime` | High-resolution millisecond timestamp marking the start time |
+    | `duration` | Total milliseconds elapsed for this entry |
+    | `kind` | The type of garbage collection operation that occurred |
+    | `flags` | Additional information about GC |
+
+    See the [performance hooks documentation](https://nodejs.org/api/perf_hooks.html) for more information.
+  </Tab>
+</Tabs>
+
+## Understanding and tuning memory
+
+Node.js, built on Google's V8 JavaScript engine, offers a powerful runtime for
+server-side JavaScript. As your applications grow, managing memory becomes
+critical for maintaining optimal performance and avoiding problems like memory
+leaks or crashes.
+
+### How V8 manages memory
+
+V8 divides memory into several parts, with two primary areas being the **heap**
+and the **stack**.
+
+#### The heap
+
+V8's memory management is based on the generational hypothesis: most objects
+die young. Therefore, it separates the heap into generations:
+
+1. **New space** — where new, short-lived objects are allocated. Garbage
+   collection occurs frequently to reclaim memory quickly. For example, a
+   high-throughput API generating a temporary object per request will have
+   these objects cleaned up via frequent minor GC cycles.
+
+2. **Old space** — where objects that survive multiple GC cycles in the new
+   space are promoted. These are usually long-lived objects such as user
+   sessions, cache data, or persistent state. GC in this space occurs less
+   often but is more resource-intensive. As the number of concurrent users
+   grows, the old space can fill up and cause out-of-memory errors or slower
+   response times.
+
+Memory for JavaScript objects, arrays, and functions is allocated in the heap.
+The heap size is not fixed; exceeding available memory causes an
+out-of-memory error.
+
+To check the current heap size limit:
+
+<CodeGroup>
+```javascript CJS
+const v8 = require('node:v8');
+const { heap_size_limit } = v8.getHeapStatistics();
+const heapSizeInGB = heap_size_limit / (1024 * 1024 * 1024);
+
+console.log(`${heapSizeInGB} GB`);
+```
+
+```javascript ESM
+import v8 from 'node:v8';
+const { heap_size_limit } = v8.getHeapStatistics();
+const heapSizeInGB = heap_size_limit / (1024 * 1024 * 1024);
+
+console.log(`${heapSizeInGB} GB`);
+```
+</CodeGroup>
+
+#### The stack
+
+The stack stores local variables and function call information. It operates on
+a Last In, First Out (LIFO) principle. Each function call pushes a new frame;
+returning pops it. The stack is smaller and faster than the heap but has a
+limited size — excessive recursion can cause a **stack overflow**.
+
+### Monitoring memory usage
+
+The `process.memoryUsage()` method shows how much memory your Node.js process
+is using:
+
+```javascript
+console.log(process.memoryUsage());
+```
+
+Example output:
+
+```json
+{
+  "rss": 25837568,
+  "heapTotal": 5238784,
+  "heapUsed": 3666120,
+  "external": 1274076,
+  "arrayBuffers": 10515
+}
+```
+
+| Field | Description |
+| --- | --- |
+| `rss` | Resident Set Size: total memory allocated to the process, including heap and other areas |
+| `heapTotal` | Total memory allocated for the heap |
+| `heapUsed` | Memory currently in use within the heap |
+| `external` | Memory used by external resources like C++ library bindings |
+| `arrayBuffers` | Memory allocated to various Buffer-like objects |
+
+If `heapUsed` steadily grows without being released, it could indicate a memory
+leak.
+
+### Command-line flags for memory tuning
+
+#### `--max-old-space-size`
+
+Sets the limit on the old space size in megabytes. Useful when your application
+holds a large amount of persistent data:
+
+```bash
+node --max-old-space-size=4096 app.js
+```
+
+#### `--max-semi-space-size`
+
+Controls the size of the new space. Increasing this reduces the frequency of
+minor GC cycles, which helps in high-throughput environments with frequent
+short-lived object creation:
+
+```bash
+node --max-semi-space-size=64 app.js
+```
+
+#### `--gc-interval`
+
+Adjusts how frequently GC cycles occur. Use with caution: too low a value
+causes performance degradation from excessive GC:
+
+```bash
+node --gc-interval=100 app.js
+```
+
+#### `--expose-gc`
+
+Exposes a `global.gc()` function that lets you manually trigger garbage
+collection — for example, after processing a large batch of data:
+
+```bash
+node --expose-gc app.js
+```
+
+```javascript
+global.gc();
+```
+
+<Warning>
+  Manually triggering GC does not disable the normal GC algorithm. V8 will
+  still perform automatic GC as needed. Overuse of `global.gc()` can
+  negatively impact performance.
+</Warning>
+
+### Additional resources
+
+- [Trash talk: the Orinoco garbage collector](https://v8.dev/blog/trash-talk)
+- [Orinoco: young generation garbage collection](https://v8.dev/blog/orinoco-parallel-scavenger)
