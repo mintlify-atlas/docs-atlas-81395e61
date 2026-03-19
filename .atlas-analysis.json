@@ -1,0 +1,144 @@
+{
+  "projectType": "general",
+  "projectName": "Node.js Learn",
+  "projectDescription": "Official Node.js learning guides covering everything from getting started to advanced topics like async programming, diagnostics, security, and TypeScript.",
+  "theme": "palm",
+  "primaryColor": "#417E38",
+  "lightColor": "#5BA34E",
+  "darkColor": "#2D5C27",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "getting-started/introduction-to-nodejs",
+              "getting-started/how-much-javascript-do-you-need-to-know-to-use-nodejs",
+              "getting-started/differences-between-nodejs-and-the-browser",
+              "getting-started/the-v8-javascript-engine",
+              "getting-started/nodejs-the-difference-between-development-and-production",
+              "getting-started/ecmascript-2015-es6-and-beyond",
+              "getting-started/nodejs-with-webassembly",
+              "getting-started/userland-migrations"
+            ]
+          },
+          {
+            "group": "Asynchronous Work",
+            "pages": [
+              "asynchronous-work/asynchronous-flow-control",
+              "asynchronous-work/overview-of-blocking-vs-non-blocking",
+              "asynchronous-work/javascript-asynchronous-programming-and-callbacks",
+              "asynchronous-work/discover-javascript-timers",
+              "asynchronous-work/event-loop-timers-and-nexttick",
+              "asynchronous-work/understanding-processnexttick",
+              "asynchronous-work/understanding-setimmediate",
+              "asynchronous-work/dont-block-the-event-loop",
+              "asynchronous-work/the-nodejs-event-emitter",
+              "asynchronous-work/discover-promises-in-nodejs",
+              "asynchronous-work/how-to-use-streams",
+              "asynchronous-work/backpressuring-in-streams"
+            ]
+          },
+          {
+            "group": "Command Line",
+            "pages": [
+              "command-line/run-nodejs-scripts-from-the-command-line",
+              "command-line/how-to-use-the-nodejs-repl",
+              "command-line/output-to-the-command-line-using-nodejs",
+              "command-line/accept-input-from-the-command-line-in-nodejs",
+              "command-line/how-to-read-environment-variables-from-nodejs"
+            ]
+          },
+          {
+            "group": "File System",
+            "pages": [
+              "file-system/nodejs-file-paths",
+              "file-system/nodejs-file-stats",
+              "file-system/reading-files-with-nodejs",
+              "file-system/writing-files-with-nodejs",
+              "file-system/working-with-file-descriptors-in-nodejs",
+              "file-system/working-with-folders-in-nodejs",
+              "file-system/working-with-different-filesystems"
+            ]
+          },
+          {
+            "group": "HTTP",
+            "pages": [
+              "http/anatomy-of-an-http-transaction",
+              "http/fetch",
+              "http/websocket",
+              "http/enterprise-network-configuration"
+            ]
+          },
+          {
+            "group": "Package Management",
+            "pages": [
+              "package-management/an-introduction-to-the-npm-package-manager",
+              "package-management/publishing-a-package",
+              "package-management/publishing-node-api-modules",
+              "package-management/abi-stability"
+            ]
+          },
+          {
+            "group": "Diagnostics",
+            "pages": [
+              "diagnostics/user-journey",
+              "diagnostics/debugging",
+              "diagnostics/profiling",
+              "diagnostics/flame-graphs"
+            ]
+          },
+          {
+            "group": "Security",
+            "pages": [
+              "security/security-best-practices"
+            ]
+          },
+          {
+            "group": "Testing",
+            "pages": [
+              "testing/introduction",
+              "testing/using-test-runner",
+              "testing/mocking",
+              "testing/collecting-code-coverage"
+            ]
+          },
+          {
+            "group": "TypeScript",
+            "pages": [
+              "typescript/introduction",
+              "typescript/run",
+              "typescript/run-natively",
+              "typescript/transpile",
+              "typescript/publishing-a-ts-package"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Comprehensive Node.js learning guides organized by topic",
+    "Covers async programming, event loop, promises, and streams",
+    "File system, HTTP, and networking guides",
+    "TypeScript integration with Node.js",
+    "Testing with the built-in Node.js test runner",
+    "Security best practices",
+    "Package management and npm workflows",
+    "Diagnostics, debugging, and performance profiling"
+  ],
+  "publicApiSurface": [
+    "getting-started/introduction-to-nodejs",
+    "asynchronous-work/event-loop-timers-and-nexttick",
+    "asynchronous-work/dont-block-the-event-loop",
+    "command-line/run-nodejs-scripts-from-the-command-line",
+    "file-system/reading-files-with-nodejs",
+    "http/anatomy-of-an-http-transaction",
+    "testing/introduction",
+    "typescript/introduction",
+    "security/security-best-practices",
+    "diagnostics/debugging"
+  ]
+}
